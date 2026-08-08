@@ -11,7 +11,8 @@ function providerErrorCategory(error: unknown) {
   if (details.category !== "provider_error") return details.category;
   if (!(error instanceof Error)) return "unknown";
   if (error.message.includes("MISSING")) return "missing_key";
-  if (error.message.includes("SAFETY")) return "safety_redirect";
+  if (error.message.includes("UNSAFE_OUTPUT")) return "unsafe_output";
+  if (error.message.includes("PROVIDER_REFUSAL")) return "provider_refusal";
   if (error.name === "ZodError" || error instanceof SyntaxError) return "schema_invalid";
   if (error.message.toLowerCase().includes("timeout")) return "timeout";
   return "provider_error";

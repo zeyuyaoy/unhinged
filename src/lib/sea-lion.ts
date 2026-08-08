@@ -28,6 +28,13 @@ function cleanJson(content: string) {
 
 type ProviderAction = CaseAction | { type: "initial" };
 
+export function providerSafetyError(disposition: string, generatedMaterial: string, excuse: string) {
+  if (containsUnsafeGeneratedClaim(generatedMaterial)) return "SEALION_UNSAFE_OUTPUT";
+  const providerRefused = /(?:cannot|can['’]?t|won['’]?t|unable to)\s+(?:help|assist|provide|generate)|(?:request|scenario)\s+(?:is|was)\s+(?:unsafe|disallowed)/i.test(excuse);
+  if (/redirect|block|refus|deny/.test(disposition.toLowerCase()) && providerRefused) return "SEALION_PROVIDER_REFUSAL";
+  return null;
+}
+
 export function seaLionErrorDetails(error: unknown) {
   if (error instanceof z.ZodError) {
     return {
@@ -40,8 +47,10 @@ export function seaLionErrorDetails(error: unknown) {
     return { category: "api_error", status: error.status, code: error.code, type: error.type };
   }
   if (error instanceof Error) {
-    const knownCategory = error.message === "SEALION_SAFETY_REDIRECT"
-      ? "safety_redirect"
+    const knownCategory = error.message === "SEALION_UNSAFE_OUTPUT"
+      ? "unsafe_output"
+      : error.message === "SEALION_PROVIDER_REFUSAL"
+        ? "provider_refusal"
       : error.message === "SEALION_EMPTY_RESPONSE"
         ? "empty_response"
         : error.message === "SEALION_KEY_MISSING"
@@ -65,10 +74,13 @@ GENERATOR ROLE
 - Keep the excuse under 130 words. Add at most one new specific detail per action.
 - Use Singapore context sparingly and naturally; never stack foods, festivals, dialect, and cultural references like a checklist.
 - Never invent deaths, serious medical emergencies, crimes, fraud, impersonation, official documents, evidence, or claims about real named people.
+- Do not mention those prohibited categories even as a disclaimer inside the generated JSON. Simply choose harmless absurdity instead.
+- For add_detail, add a harmless sensory, timing, transit, aquarium, pigeon, or paperwork detail. Never turn the detail into evidence or a document the user could present.
 
 EVALUATOR ROLE
 - Score the resulting text, identify contradictions, and recommend when the user should stop.
-- Return safety_disposition "redirect" if the request cannot be kept harmless.
+- Return safety_disposition "allow" for harmless fictional comedy at every chaos level, even when it is wildly implausible.
+- Return safety_disposition "redirect" only if the ORIGINAL user scenario requests a prohibited serious claim. Do not redirect merely because the story is absurd, contradictory, or highly suspicious.
 
 Return ONLY one JSON object with these exact keys. All five metric values must be whole numbers from 0 to 100:
 excuse, new_lore, claims, metrics {believability, unhingedness, suspicion, loreDensity, commitment}, contradictions, recommendation, safety_disposition.
@@ -127,9 +139,8 @@ export async function applySeaLionAction(
     ...parsed.claims,
     ...parsed.new_lore.map((item) => JSON.stringify(item)),
   ].join("\n");
-  if (/redirect|block|refus|deny/.test(disposition) || containsUnsafeGeneratedClaim(generatedMaterial)) {
-    throw new Error("SEALION_SAFETY_REDIRECT");
-  }
+  const safetyError = providerSafetyError(disposition, generatedMaterial, parsed.excuse);
+  if (safetyError) throw new Error(safetyError);
 
   const existingNames = new Set(deterministic.lore.map((item) => item.name.toLowerCase()));
   const providerLore = parsed.new_lore

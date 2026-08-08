@@ -72,6 +72,9 @@ export function PaperworkPanic({
   const [hazardsHit, setHazardsHit] = useState(0);
   const [hazardStep, setHazardStep] = useState(0);
   const resolvedRef = useRef(false);
+  const positionRef = useRef<Position>({ x: 0, y: 2 });
+  const collectedIdsRef = useRef<number[]>([]);
+  const hazardsHitRef = useRef(0);
   const modalRef = useRef<HTMLDivElement>(null);
   const skipRef = useRef<HTMLButtonElement>(null);
   const reducedMotion = useRef(false);
@@ -80,16 +83,18 @@ export function PaperworkPanic({
     if (resolvedRef.current) return;
     resolvedRef.current = true;
     onStopAudio();
-    const delivered = !skipped && collectedIds.length >= round.targetCount && hazardsHit < 3;
+    const collected = collectedIdsRef.current.length;
+    const hazardCount = hazardsHitRef.current;
+    const delivered = !skipped && collected >= round.targetCount && hazardCount < 3;
     if (!skipped) onPlayCue(delivered ? "arcade_win" : "arcade_fail", chaosLevel);
     onResolve({
       type: "resolve_arcade_round",
       roundId: round.id,
-      collected: collectedIds.length,
-      hazardsHit,
+      collected,
+      hazardsHit: hazardCount,
       skipped,
     });
-  }, [chaosLevel, collectedIds.length, hazardsHit, onPlayCue, onResolve, onStopAudio, round.id, round.targetCount]);
+  }, [chaosLevel, onPlayCue, onResolve, onStopAudio, round.id, round.targetCount]);
 
   useEffect(() => {
     const previousFocus = document.activeElement as HTMLElement | null;
@@ -134,20 +139,24 @@ export function PaperworkPanic({
   const movePigeon = useCallback((direction: Direction) => {
     if (busy || resolvedRef.current) return;
     if (reducedMotion.current) setHazardStep((step) => step + 1);
-    setPosition((current) => {
-      const next = move(current, direction);
-      const formIndex = layout.forms.findIndex((form, index) => !collectedIds.includes(index) && samePosition(form, next));
-      if (formIndex >= 0) {
-        setCollectedIds((items) => [...items, formIndex]);
-        onPlayCue("collect", chaosLevel);
-      }
-      if (hazardPositions.some((hazard) => samePosition(hazard, next))) {
-        setHazardsHit((hits) => Math.min(12, hits + 1));
-        onPlayCue("hazard", chaosLevel);
-      }
-      return next;
-    });
-  }, [busy, chaosLevel, collectedIds, hazardPositions, layout.forms, onPlayCue]);
+    const next = move(positionRef.current, direction);
+    positionRef.current = next;
+    setPosition(next);
+
+    const formIndex = layout.forms.findIndex((form, index) => !collectedIdsRef.current.includes(index) && samePosition(form, next));
+    if (formIndex >= 0) {
+      const nextCollected = [...collectedIdsRef.current, formIndex];
+      collectedIdsRef.current = nextCollected;
+      setCollectedIds(nextCollected);
+      onPlayCue("collect", chaosLevel);
+    }
+    if (hazardPositions.some((hazard) => samePosition(hazard, next))) {
+      const nextHazardsHit = Math.min(12, hazardsHitRef.current + 1);
+      hazardsHitRef.current = nextHazardsHit;
+      setHazardsHit(nextHazardsHit);
+      onPlayCue("hazard", chaosLevel);
+    }
+  }, [busy, chaosLevel, hazardPositions, layout.forms, onPlayCue]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {

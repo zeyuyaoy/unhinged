@@ -31,6 +31,7 @@ export function useAudioDirector() {
   const arcadeTimerRef = useRef<number | null>(null);
   const captionTimerRef = useRef<number | null>(null);
   const activatedRef = useRef(false);
+  const mutedRef = useRef(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolumeState] = useState(0.25);
   const [caption, setCaption] = useState("");
@@ -53,6 +54,10 @@ export function useAudioDirector() {
   }, []);
 
   const ensureContext = useCallback(() => {
+    if (contextRef.current?.state === "closed") {
+      contextRef.current = null;
+      masterRef.current = null;
+    }
     if (!contextRef.current) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (!AudioContextClass) return null;
@@ -62,11 +67,13 @@ export function useAudioDirector() {
       contextRef.current = context;
       masterRef.current = master;
     }
-    void contextRef.current.resume();
-    return contextRef.current;
+    const context = contextRef.current;
+    if (context.state === "suspended") void context.resume().catch(() => undefined);
+    return context;
   }, []);
 
   useEffect(() => {
+    mutedRef.current = muted;
     if (masterRef.current) masterRef.current.gain.setTargetAtTime(muted ? 0 : volume, masterRef.current.context.currentTime, 0.01);
   }, [muted, volume]);
 
@@ -116,7 +123,7 @@ export function useAudioDirector() {
       const notes = [262, 330, 392, 523];
       const context = contextRef.current;
       const master = masterRef.current;
-      if (!context || !master) return;
+      if (!context || context.state === "closed" || !master) return;
       const oscillator = context.createOscillator();
       const gain = context.createGain();
       oscillator.type = "square";
@@ -134,6 +141,7 @@ export function useAudioDirector() {
   const toggleMuted = useCallback(() => {
     setMuted((current) => {
       const next = !current;
+      mutedRef.current = next;
       window.localStorage.setItem(MUTED_KEY, String(next));
       if (next) stopArcade();
       return next;
@@ -150,9 +158,11 @@ export function useAudioDirector() {
     const onVisibility = () => {
       if (document.hidden) {
         stopArcade();
-        void contextRef.current?.suspend();
-      } else if (activatedRef.current && !muted) {
-        void contextRef.current?.resume();
+        const context = contextRef.current;
+        if (context?.state === "running") void context.suspend().catch(() => undefined);
+      } else if (activatedRef.current && !mutedRef.current) {
+        const context = contextRef.current;
+        if (context?.state === "suspended") void context.resume().catch(() => undefined);
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
@@ -160,9 +170,12 @@ export function useAudioDirector() {
       document.removeEventListener("visibilitychange", onVisibility);
       stopArcade();
       if (captionTimerRef.current) window.clearTimeout(captionTimerRef.current);
-      void contextRef.current?.close();
+      const context = contextRef.current;
+      contextRef.current = null;
+      masterRef.current = null;
+      if (context && context.state !== "closed") void context.close().catch(() => undefined);
     };
-  }, [muted, stopArcade]);
+  }, [stopArcade]);
 
   const status: AudioStatus = muted ? "muted" : activated ? "active" : "armed";
   return { status, muted, volume, caption, activateForAction, play, startArcade, stopArcade, toggleMuted, setVolume };

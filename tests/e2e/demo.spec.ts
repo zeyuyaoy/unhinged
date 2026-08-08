@@ -207,6 +207,19 @@ test("sound can be muted before its first action and the preference persists", a
   await expect(page.getByRole("button", { name: "Turn sound on" })).toContainText("Sound off");
 });
 
+test("audio survives mute changes without closing its context", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop header exposes the persistent sound control.");
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.goto("/");
+  await page.getByRole("button", { name: /Generate excuse/i }).click();
+  await page.getByRole("button", { name: "Mute sound" }).click();
+  await page.getByRole("button", { name: "Turn sound on" }).click();
+  await page.getByRole("button", { name: "Make it worse" }).click();
+  await expect(page.locator(".document-heading")).toContainText("v.02");
+  expect(pageErrors).toEqual([]);
+});
+
 test("pending arcade rounds survive reload and Escape skips safely", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Desktop covers reload and keyboard escape; mobile controls are captured separately.");
   await page.goto("/");
