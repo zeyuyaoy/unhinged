@@ -210,7 +210,9 @@ test("sound can be muted before its first action and the preference persists", a
 test("audio survives mute changes without closing its context", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop", "Desktop header exposes the persistent sound control.");
   const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
   await page.goto("/");
   await page.getByRole("button", { name: /Generate excuse/i }).click();
   await page.getByRole("button", { name: "Mute sound" }).click();
@@ -218,6 +220,33 @@ test("audio survives mute changes without closing its context", async ({ page },
   await page.getByRole("button", { name: "Make it worse" }).click();
   await expect(page.locator(".document-heading")).toContainText("v.02");
   expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
+test("collecting arcade paperwork does not update parent state during render", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "Desktop covers the keyboard collection path.");
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+  await page.goto("/");
+  await page.getByRole("button", { name: /Generate excuse/i }).click();
+  for (let index = 0; index < 4; index += 1) await page.getByRole("button", { name: "Make it worse" }).click();
+  const dialog = page.getByRole("dialog", { name: "Paperwork Panic" });
+  await expect(dialog).toBeVisible();
+
+  const target = await dialog.locator(".arcade-form").first().evaluate((element) => {
+    const image = element as HTMLElement;
+    return {
+      x: Math.round((Number.parseFloat(image.style.left) - 3) / 9.5),
+      y: Math.round((Number.parseFloat(image.style.top) - 5) / 18),
+    };
+  });
+  for (let y = 2; y > target.y; y -= 1) await page.keyboard.press("ArrowUp");
+  for (let y = 2; y < target.y; y += 1) await page.keyboard.press("ArrowDown");
+  for (let x = 0; x < target.x; x += 1) await page.keyboard.press("ArrowRight");
+  await expect(page.getByText("FORM ACQUIRED", { exact: true })).toBeVisible();
+  expect(consoleErrors.filter((message) => message.includes("Cannot update a component"))).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
 });
 
 test("pending arcade rounds survive reload and Escape skips safely", async ({ page }, testInfo) => {
