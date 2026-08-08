@@ -12,8 +12,8 @@ export default defineConfig({
   webServer: {
     command: "pnpm dev",
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: true,
-    env: { SEALION_API_KEY: "" },
+    reuseExistingServer: false,
+    env: { SEALION_DISABLED: "1" },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1536, height: 980 } } },

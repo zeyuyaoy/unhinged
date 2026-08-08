@@ -58,6 +58,21 @@ describe("chaos engine", () => {
     state = applyFallbackAction(state, { type: "answer_interrogation", answer: "Raymond is actually my teacher." });
     expect(state.contradictions).toContain("Raymond was previously established as your alleged uncle.");
   });
+
+  it("keeps fallback copy logical for non-assignment scenarios", () => {
+    const plans = createFallbackState({
+      id: "7d9e98b4-6d37-4ce1-907e-c042340ca120",
+      caseNumber: 2,
+      scenario: "I need to cancel plans with a friend at the last minute.",
+      audience: "friend",
+      userRole: "adult",
+      genre: "normal",
+      startingChaos: 1,
+    });
+    const escalated = applyFallbackAction(plans, { type: "make_worse" });
+    expect(escalated.currentExcuse).toContain("can’t make it");
+    expect(escalated.currentExcuse).not.toContain("assignment");
+  });
 });
 
 describe("product safety", () => {

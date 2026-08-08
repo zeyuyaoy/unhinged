@@ -20,7 +20,13 @@ function providerErrorCategory(error: unknown) {
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const started = Date.now();
   const { id } = await context.params;
-  const parsed = actionRequestSchema.safeParse(await request.json());
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ code: "INVALID_JSON" }, { status: 400 });
+  }
+  const parsed = actionRequestSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ code: "VALIDATION", issues: parsed.error.issues }, { status: 400 });
   const { ownerHash, safetyIdentifier } = await getDeviceIdentity();
 
@@ -51,11 +57,13 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         source = "live";
       } catch (error) {
         errorCategory = providerErrorCategory(error);
-        console.warn("sea_lion_action_fallback", {
-          caseId: id,
-          action: parsed.data.action.type,
-          ...seaLionErrorDetails(error),
-        });
+        if (errorCategory !== "missing_key") {
+          console.warn("sea_lion_action_fallback", {
+            caseId: id,
+            action: parsed.data.action.type,
+            ...seaLionErrorDetails(error),
+          });
+        }
       }
     }
 

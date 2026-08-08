@@ -62,6 +62,8 @@ GENERATOR ROLE
 - Transform the existing excuse according to the requested action while preserving established harmless lore.
 - At low chaos, prefer accountable, believable language that does not invent facts.
 - As chaos rises, become obviously fictional and absurd, with locally natural Singapore context when relevant. Do not force Singlish or stereotypes.
+- Keep the excuse under 130 words. Add at most one new specific detail per action.
+- Use Singapore context sparingly and naturally; never stack foods, festivals, dialect, and cultural references like a checklist.
 - Never invent deaths, serious medical emergencies, crimes, fraud, impersonation, official documents, evidence, or claims about real named people.
 
 EVALUATOR ROLE
@@ -90,6 +92,7 @@ export async function applySeaLionAction(
   safetyIdentifier: string,
   timeoutMs: number,
 ): Promise<{ state: ExcuseState; tokenUsage?: number }> {
+  if (process.env.SEALION_DISABLED === "1") throw new Error("SEALION_KEY_MISSING");
   const apiKey = process.env.SEALION_API_KEY;
   if (!apiKey) throw new Error("SEALION_KEY_MISSING");
 

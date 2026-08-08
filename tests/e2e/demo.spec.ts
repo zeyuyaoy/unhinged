@@ -14,18 +14,18 @@ test("completes the two-minute chaos loop", async ({ page }, testInfo) => {
 
   await page.getByRole("button", { name: /Generate excuse/i }).click();
   await expect(page.getByRole("heading", { name: "Your current excuse" })).toBeVisible();
-  await expect(page.getByText(/Demo fallback active/i)).toBeVisible();
+  await expect(page.locator(".toast").getByText(/Demo fallback active/i)).toBeVisible();
   await expect(page).toHaveScreenshot("calm-workspace.png", { fullPage: true, animations: "disabled" });
 
   await page.getByRole("button", { name: "Make it worse" }).click();
-  await expect(page.getByText(/Chaos 3/i).first()).toBeVisible();
+  await expect(testInfo.project.name === "mobile" ? page.locator(".mobile-case-summary").getByText(/Chaos 3/i) : page.locator(".chaos-status").getByText(/Chaos 3/i)).toBeVisible();
   await page.getByRole("button", { name: "Add lore" }).click();
-  await expect(page.getByText("Raymond").first()).toBeVisible();
+  await expect(page.locator(".lore-list").getByText("Raymond")).toBeVisible();
   await page.getByRole("button", { name: "Escalate universe" }).click();
-  await expect(page.getByText(/Aquarium Incident/i).first()).toBeVisible();
+  await expect(page.locator(".lore-list").getByText(/Aquarium Incident/i)).toBeVisible();
 
   await page.getByRole("button", { name: "Interrogate me" }).click();
-  await expect(page.getByRole("heading", { name: /interrogation/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Teacher interrogation/i, level: 1 })).toBeVisible();
   await expect(page).toHaveScreenshot("interrogation.png", { fullPage: true, animations: "disabled" });
   for (let question = 1; question <= 5; question += 1) {
     await page.getByLabel("Your answer").fill(`Raymond gave answer ${question} about the aquarium timeline.`);
@@ -34,7 +34,12 @@ test("completes the two-minute chaos loop", async ({ page }, testInfo) => {
 
   await expect(page.getByText("JUST SUBMIT THE ASSIGNMENT.")).toBeVisible();
   await expect(page.getByText(/AI recommendation: Just submit the assignment/i)).toBeVisible();
-  await expect(page).toHaveScreenshot("final-judgment.png", { fullPage: true, animations: "disabled" });
+  await expect(page.locator(".toast")).toContainText("Timeline checked");
+  await expect(page).toHaveScreenshot("final-judgment.png", {
+    fullPage: true,
+    animations: "disabled",
+    mask: [page.locator(".toast")],
+  });
 });
 
 test("theme and browser-linked history work", async ({ page }) => {
