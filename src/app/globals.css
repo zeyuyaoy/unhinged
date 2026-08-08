@@ -163,7 +163,7 @@ h1, h2, h3, p { margin-top: 0; }
 .action-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; }
 .action-grid button { border: 1px solid var(--border-strong); background: var(--surface); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; gap: 9px; font-weight: 600; padding: 0 12px; }
 .action-grid button:hover { border-color: var(--primary); background: var(--primary-soft); }
-.action-grid .make-worse { grid-column: 1 / -1; min-height: 70px; background: var(--primary); border-color: var(--primary); color: white; font-size: 18px; }
+.action-grid .make-worse { background: var(--primary); border-color: var(--primary); color: white; font-size: 16px; }
 .action-grid .make-worse:hover { background: var(--primary-hover); }
 .final-judgment { margin-top: 28px; border: 1px solid var(--danger); background: var(--danger-soft); border-radius: var(--radius); padding: 22px; display: flex; align-items: center; gap: 16px; }
 .final-judgment svg { color: var(--danger); width: 32px; height: 32px; }

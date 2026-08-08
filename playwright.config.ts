@@ -5,15 +5,15 @@ export default defineConfig({
   fullyParallel: false,
   reporter: "list",
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: "http://127.0.0.1:3100",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
   webServer: {
-    command: "pnpm dev",
-    url: "http://127.0.0.1:3000",
+    command: "pnpm exec next dev -p 3100",
+    url: "http://127.0.0.1:3100",
     reuseExistingServer: false,
-    env: { SEALION_DISABLED: "1" },
+    env: { SEALION_DISABLED: "1", NEXT_DIST_DIR: ".next-playwright" },
   },
   projects: [
     { name: "desktop", use: { ...devices["Desktop Chrome"], viewport: { width: 1536, height: 980 } } },

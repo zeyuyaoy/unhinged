@@ -32,14 +32,18 @@ test("completes the two-minute chaos loop", async ({ page }, testInfo) => {
     await page.getByRole("button", { name: /Submit answer/i }).click();
   }
 
-  await expect(page.getByText("JUST SUBMIT THE ASSIGNMENT.")).toBeVisible();
+  await expect(page.getByText("JUST SUBMIT THE ASSIGNMENT.", { exact: true })).toBeVisible();
   await expect(page.getByText(/AI recommendation: Just submit the assignment/i)).toBeVisible();
   await expect(page.locator(".toast")).toContainText("Timeline checked");
-  await expect(page).toHaveScreenshot("final-judgment.png", {
-    fullPage: true,
-    animations: "disabled",
-    mask: [page.locator(".toast")],
-  });
+  if (testInfo.project.name === "mobile") {
+    await expect(page.locator(".final-judgment")).toHaveScreenshot("final-judgment.png", { animations: "disabled" });
+  } else {
+    await expect(page).toHaveScreenshot("final-judgment.png", {
+      fullPage: true,
+      animations: "disabled",
+      mask: [page.locator(".toast")],
+    });
+  }
 });
 
 test("theme and browser-linked history work", async ({ page }) => {
