@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Maximum Extra",
-  description: "An interactive narrative chaos engine for harmless creative roleplay.",
+  title: "Extrcuse Generater",
+  description: "A progressively unhinged excuse generator for harmless creative roleplay.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

@@ -1,6 +1,6 @@
-# Maximum Extra
+# Extrcuse Generater
 
-Maximum Extra is a full-stack Next.js demo that turns a harmless everyday situation into an increasingly absurd excuse, remembers recurring lore, and ends with a five-question contradiction check. The interface begins calm and readable, then adds bounded visual chaos without moving navigation or compromising the main reading order.
+Extrcuse Generater is a full-stack Next.js demo that turns a harmless everyday situation into an increasingly absurd excuse, remembers recurring lore, and ends with a five-question contradiction check. The interface begins calm and readable, then adds bounded visual chaos without moving navigation or compromising the main reading order.
 
 ## Run locally
 

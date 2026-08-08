@@ -10,7 +10,7 @@ export const CHAOS_LABELS = [
   "Reality bending",
   "International incident",
   "Physics optional",
-  "Maximum Extra",
+  "Maximum Extrcuse",
   "Tell the truth",
 ] as const;
 

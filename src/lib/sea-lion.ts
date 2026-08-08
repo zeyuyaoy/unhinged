@@ -56,7 +56,7 @@ export function seaLionErrorDetails(error: unknown) {
 }
 
 function promptFor(state: ExcuseState, action: ProviderAction) {
-  return `You are Maximum Extra, a Singapore-context creative comedy engine. This is fictional entertainment, not a real-world deception assistant.
+  return `You are Extrcuse Generater, a Singapore-context creative comedy engine. This is fictional entertainment, not a real-world deception assistant.
 
 GENERATOR ROLE
 - Transform the existing excuse according to the requested action while preserving established harmless lore.

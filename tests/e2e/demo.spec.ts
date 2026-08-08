@@ -26,7 +26,7 @@ test("health and safety boundaries are ready", async ({ request }) => {
 
 test("completes the two-minute chaos loop", async ({ page }, testInfo) => {
   await page.goto("/");
-  await expect(page).toHaveTitle(/Maximum Extra/);
+  await expect(page).toHaveTitle(/Extrcuse Generater/);
   await expect(page.getByRole("heading", { name: "What’s your situation?" })).toBeVisible();
   await expect(page).toHaveScreenshot("creation.png", { fullPage: true, animations: "disabled" });
 
@@ -59,13 +59,16 @@ test("completes the two-minute chaos loop", async ({ page }, testInfo) => {
   await expect(page.getByText("JUST SUBMIT THE ASSIGNMENT.", { exact: true })).toBeVisible();
   await expect(page.getByText(/AI recommendation: Just submit the assignment/i)).toBeVisible();
   await expect(page.locator(".toast")).toContainText("Timeline checked");
+  if (testInfo.project.name === "desktop") {
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations).toEqual([]);
+  }
   if (testInfo.project.name === "mobile") {
     await expect(page.locator(".final-judgment")).toHaveScreenshot("final-judgment.png", { animations: "disabled" });
   } else {
     await expect(page).toHaveScreenshot("final-judgment.png", {
       fullPage: true,
       animations: "disabled",
-      mask: [page.locator(".toast")],
     });
   }
 });

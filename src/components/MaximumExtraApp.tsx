@@ -94,7 +94,7 @@ function AppHeader({
   return (
     <header className="app-header">
       <button className="mobile-menu icon-button" onClick={onMenu} aria-label="Open menu"><Menu /></button>
-      <button className="wordmark" onClick={onNewCase} aria-label="Maximum Extra home">MAXIMUM EXTRA</button>
+      <button className="wordmark" onClick={onNewCase} aria-label="Extrcuse Generater home">EXTRCUSE GENERATER</button>
       {state && (
         <>
           <span className="header-divider" aria-hidden="true" />
@@ -120,12 +120,12 @@ function SafetyBar({ critical = false }: { critical?: boolean }) {
       <summary>
         {critical ? <AlertTriangle /> : <Info />}
         <span className="safety-summary">
-          {critical ? <strong>System alert: Maximum Extra chaos level reached.</strong> : "For entertainment and creative roleplay."}
+          {critical ? <strong>System alert: Extrcuse Generater chaos level reached.</strong> : "For entertainment and creative roleplay."}
           <span className="safety-long"> Don’t invent real emergencies, crimes, medical claims, or impersonate anyone.</span>
         </span>
         <span className="safety-link">Safety <ChevronDown /></span>
       </summary>
-      <p>Keep scenarios fictional and harmless. Maximum Extra will not create fake evidence, official documents, financial fraud, or serious emergency claims.</p>
+      <p>Keep scenarios fictional and harmless. Extrcuse Generater will not create fake evidence, official documents, financial fraud, or serious emergency claims.</p>
     </details>
   );
 }
@@ -270,7 +270,7 @@ function MetricBar({ label, value }: { label: string; value: number }) {
 function DnaPanel({ state }: { state: ExcuseState }) {
   const { metrics } = state;
   return (
-    <aside className="insights-panel">
+    <aside className="insights-panel" aria-label="Excuse analysis">
       <section aria-labelledby="dna-heading">
         <h2 id="dna-heading">Excuse DNA <Info /></h2>
         <MetricBar label="Believability" value={metrics.believability} />
@@ -301,7 +301,7 @@ function LoreItem({ item }: { item: LoreObject }) {
 
 function CaseRail({ state, collapsed, onToggle }: { state: ExcuseState; collapsed: boolean; onToggle: () => void }) {
   return (
-    <aside className={`case-rail ${collapsed ? "collapsed" : ""}`}>
+    <aside className={`case-rail ${collapsed ? "collapsed" : ""}`} aria-label="Case state">
       <button className="rail-toggle icon-button" onClick={onToggle} aria-label={collapsed ? "Show case state" : "Hide case state"}>{collapsed ? <ChevronRight /> : <ArrowLeft />}</button>
       {!collapsed && (
         <>
@@ -375,7 +375,7 @@ function InterrogationView({ state, busy, onAction }: { state: ExcuseState; busy
   const questionNumber = interrogation.questionNumber;
   return (
     <main className="interrogation-view">
-      <aside className="interrogation-rail">
+      <aside className="interrogation-rail" aria-label="Interrogation case state">
         <span className="eyebrow">Original situation</span><p>{state.scenario.text}</p>
         <div><span className="eyebrow">Adversary</span><strong><UserRound /> {audienceLabels[state.scenario.audience]}</strong></div>
         <div><span className="eyebrow">You are</span><strong><UserRound /> {roleLabels[state.scenario.userRole]}</strong></div>
@@ -400,7 +400,7 @@ function InterrogationView({ state, busy, onAction }: { state: ExcuseState; busy
           <button disabled={busy} onClick={() => onAction({ type: "retreat" })}>Retreat and tell the truth <Flag /></button>
         </div>
       </section>
-      <aside className="interrogation-insights">
+      <aside className="interrogation-insights" aria-label="Interrogation analysis">
         <section className="suspicion-card"><span>Suspicion</span><strong>{state.metrics.suspicion}%</strong><div className="meter"><span style={{ width: `${state.metrics.suspicion}%` }} /></div><p>{state.metrics.suspicion > 80 ? "High suspicion" : "Building suspicion"}</p></section>
         <section className="consistency-card"><h2><Lightbulb /> Lore consistency check</h2><strong>{Math.max(2, state.contradictions.length)} claims at risk</strong>{state.contradictions.length ? <ul>{state.contradictions.map((item) => <li key={item}>{item}</li>)}</ul> : <ul><li>Raymond’s location and possession of the file overlap.</li><li>The delay timeline is increasingly difficult to verify.</li></ul>}</section>
         <section className="interrogation-log"><h2>Interrogation log</h2>{interrogation.transcript.map((item, index) => <div key={item.id}><span>{item.speaker === "interrogator" ? `Q${Math.ceil((index + 1) / 2)}` : `A${Math.ceil((index + 1) / 2)}`}</span><p>{item.text}</p></div>)}</section>
@@ -523,7 +523,7 @@ export function MaximumExtraApp() {
   return (
     <ThemeShell state={state} liveMessage={notice} onNewCase={() => { setState(null); setNotice("New case ready."); }} onHistory={() => setHistoryOpen(true)}>
       {!state ? <CreationView recentCases={recentCases} onCreate={createCase} onOpen={openCase} busy={busy} /> : isInterrogating ? <InterrogationView state={state} busy={busy} onAction={act} /> : <WorkspaceView state={state} busy={busy} onAction={act} />}
-      {notice && <div className={`toast ${notice.toLowerCase().includes("fallback") ? "fallback-toast" : ""}`}><Sparkles /><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss notification"><X /></button></div>}
+      {notice && <div className={`toast ${notice.toLowerCase().includes("fallback") ? "fallback-toast" : ""}`} role="region" aria-label="Status notification"><Sparkles /><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss notification"><X /></button></div>}
       {historyOpen && <HistoryDrawer cases={recentCases} onClose={closeHistory} onOpen={openCase} onClear={clearHistory} />}
     </ThemeShell>
   );
