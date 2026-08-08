@@ -1,4 +1,4 @@
-import type { CaseAction, ExcuseState, LoreObject, Metrics } from "@/lib/types";
+import type { ArcadeState, CaseAction, ExcuseState, LoreObject, Metrics } from "@/lib/types";
 
 export const PRIMARY_LORE_ID = "CHAR-001";
 export const PRIMARY_LORE: LoreObject = {
@@ -11,6 +11,26 @@ export const PRIMARY_LORE: LoreObject = {
 };
 
 const LEGACY_PRIMARY_LORE_NAME = "Raymond";
+
+export const EMPTY_ARCADE_STATE: ArcadeState = {
+  roundsPlayed: 0,
+  deliveries: 0,
+  misfiles: 0,
+  skips: 0,
+  bestScore: 0,
+  collectibles: [],
+};
+
+const ARCADE_COLLECTIBLES = [
+  "Form 404: Deadline Not Found",
+  "Aquarium Transit Visa",
+  "Certified Breadcrumb Voucher",
+  "Non-Vehicular Bus Permit",
+  "Maritime Clause Decoder Ring",
+  "Reality Recount Receipt",
+] as const;
+
+export class ArcadeRoundConflictError extends Error {}
 
 export const CHAOS_LABELS = [
   "Completely normal",
@@ -55,13 +75,48 @@ function metric(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-export function metricsForLevel(level: number, loreCount: number, interrogationAnswers = 0): Metrics {
+export function arcadeMetricModifiers(arcade: ArcadeState = EMPTY_ARCADE_STATE) {
+  return {
+    suspicion: clamp(arcade.misfiles * 4 - arcade.deliveries * 3, -9, 12),
+    commitment: clamp(arcade.deliveries * 3, 0, 9),
+  };
+}
+
+export function metricsForLevel(level: number, loreCount: number, interrogationAnswers = 0, arcade: ArcadeState = EMPTY_ARCADE_STATE): Metrics {
+  const modifiers = arcadeMetricModifiers(arcade);
   return {
     believability: metric(92 - level * 9.6 - interrogationAnswers * 2),
     unhingedness: metric(4 + level * 10.4),
-    suspicion: metric(9 + level * 9.5 + interrogationAnswers * 5),
+    suspicion: metric(9 + level * 9.5 + interrogationAnswers * 5 + modifiers.suspicion),
     loreDensity: metric(loreCount * 21 + level * 2),
-    commitment: metric(38 + level * 7.2),
+    commitment: metric(38 + level * 7.2 + modifiers.commitment),
+  };
+}
+
+function seededNumber(value: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+export function shouldScheduleArcade(action: CaseAction) {
+  return ["make_worse", "add_lore", "add_detail", "escalate_universe", "begin_interrogation", "answer_interrogation"].includes(action.type);
+}
+
+export function scheduleArcadeRound(state: ExcuseState, action: CaseAction): ExcuseState {
+  const arcade = state.arcade ?? EMPTY_ARCADE_STATE;
+  if (state.chaosLevel < 8 || arcade.pendingRound || !shouldScheduleArcade(action)) return { ...state, arcade };
+  const id = `${state.id}:${state.version}:paperwork-panic`;
+  const seedInput = `${state.scenario.text}:${state.version}:${arcade.roundsPlayed}`;
+  return {
+    ...state,
+    arcade: {
+      ...arcade,
+      pendingRound: { id, seed: seededNumber(seedInput), durationMs: 8000, targetCount: 3 },
+    },
   };
 }
 
@@ -213,6 +268,9 @@ export function normalizeLegacyLoreState(state: ExcuseState): ExcuseState {
         transcript: state.interrogation.transcript.map((item) => item.speaker === "user" ? item : { ...item, text: normalizeText(item.text) }),
       }
     : undefined;
+  const arcade = state.arcade
+    ? { ...EMPTY_ARCADE_STATE, ...state.arcade, collectibles: [...new Set(state.arcade.collectibles ?? [])].slice(0, 12) }
+    : { ...EMPTY_ARCADE_STATE };
   return {
     ...state,
     currentExcuse: normalizeText(state.currentExcuse),
@@ -222,6 +280,7 @@ export function normalizeLegacyLoreState(state: ExcuseState): ExcuseState {
       ? `${PRIMARY_LORE.name} was previously established as your ${PRIMARY_LORE.role.toLowerCase()}.`
       : normalizeText(item)),
     interrogation,
+    arcade,
     recommendation: normalizeText(state.recommendation),
     finalJudgment: state.finalJudgment ? normalizeText(state.finalJudgment) : undefined,
   };
@@ -251,6 +310,7 @@ export function createFallbackState(input: {
     lore: [],
     claims: ["A transport delay affected the schedule."],
     contradictions: [],
+    arcade: { ...EMPTY_ARCADE_STATE },
     recommendation: "This is believable enough. You could stop here.",
     status: "active",
     source: "fallback",
@@ -261,6 +321,41 @@ export function createFallbackState(input: {
 
 export function applyFallbackAction(state: ExcuseState, action: CaseAction, source: "local" | "fallback" = "fallback"): ExcuseState {
   const now = new Date().toISOString();
+  const currentArcade = state.arcade ?? { ...EMPTY_ARCADE_STATE };
+
+  if (action.type === "resolve_arcade_round") {
+    const pending = currentArcade.pendingRound;
+    if (!pending || pending.id !== action.roundId) throw new ArcadeRoundConflictError("ARCADE_ROUND_CONFLICT");
+    const delivered = !action.skipped && action.collected >= pending.targetCount && action.hazardsHit < 3;
+    const score = Math.max(0, action.collected * 100 - action.hazardsHit * 25);
+    const collectible = ARCADE_COLLECTIBLES[currentArcade.deliveries % ARCADE_COLLECTIBLES.length];
+    const arcade: ArcadeState = {
+      ...currentArcade,
+      pendingRound: undefined,
+      roundsPlayed: currentArcade.roundsPlayed + 1,
+      deliveries: currentArcade.deliveries + (delivered ? 1 : 0),
+      misfiles: currentArcade.misfiles + (!action.skipped && !delivered ? 1 : 0),
+      skips: currentArcade.skips + (action.skipped ? 1 : 0),
+      bestScore: Math.max(currentArcade.bestScore, score),
+      collectibles: delivered
+        ? [...new Set([...currentArcade.collectibles, collectible])].slice(0, 12)
+        : currentArcade.collectibles,
+    };
+    const contradictions = !action.skipped && !delivered
+      ? [...new Set([...state.contradictions, "Paperwork Panic misfiled another form before it reached the aquarium portal."])]
+      : state.contradictions;
+    const answered = state.interrogation?.transcript.filter((item) => item.speaker === "user").length ?? 0;
+    return {
+      ...state,
+      version: state.version + 1,
+      metrics: metricsForLevel(state.chaosLevel, state.lore.length, answered, arcade),
+      contradictions,
+      arcade,
+      source,
+      updatedAt: now,
+    };
+  }
+
   let chaos = state.chaosLevel;
   let universe = state.universeLevel;
   let interrogation = state.interrogation;
@@ -336,9 +431,10 @@ export function applyFallbackAction(state: ExcuseState, action: CaseAction, sour
     universeLevel: universe,
     currentExcuse: copyForScenario(state.scenario.text, chaos),
     lore: nextLore,
-    metrics: metricsForLevel(chaos, nextLore.length, answered),
+    metrics: metricsForLevel(chaos, nextLore.length, answered, currentArcade),
     contradictions,
     interrogation,
+    arcade: currentArcade,
     recommendation,
     finalJudgment,
     status,

@@ -42,6 +42,23 @@ export const interrogationSchema = z.object({
   transcript: z.array(transcriptItemSchema),
 });
 
+export const arcadeRoundSchema = z.object({
+  id: z.string().min(1).max(160),
+  seed: z.number().int().nonnegative(),
+  durationMs: z.literal(8000),
+  targetCount: z.literal(3),
+});
+
+export const arcadeStateSchema = z.object({
+  pendingRound: arcadeRoundSchema.optional(),
+  roundsPlayed: z.number().int().nonnegative(),
+  deliveries: z.number().int().nonnegative(),
+  misfiles: z.number().int().nonnegative(),
+  skips: z.number().int().nonnegative(),
+  bestScore: z.number().int().nonnegative(),
+  collectibles: z.array(z.string().min(1).max(80)).max(12),
+});
+
 export const excuseStateSchema = z.object({
   id: z.string(),
   caseNumber: z.number().int().positive(),
@@ -60,6 +77,7 @@ export const excuseStateSchema = z.object({
   claims: z.array(z.string()),
   contradictions: z.array(z.string()),
   interrogation: interrogationSchema.optional(),
+  arcade: arcadeStateSchema,
   recommendation: z.string(),
   finalJudgment: z.string().optional(),
   status: z.enum(["active", "saved", "resolved"]),
@@ -71,6 +89,8 @@ export const excuseStateSchema = z.object({
 export type ExcuseState = z.infer<typeof excuseStateSchema>;
 export type Metrics = z.infer<typeof metricsSchema>;
 export type LoreObject = z.infer<typeof loreObjectSchema>;
+export type ArcadeRound = z.infer<typeof arcadeRoundSchema>;
+export type ArcadeState = z.infer<typeof arcadeStateSchema>;
 
 export const createCaseSchema = z.object({
   scenario: z.string().trim().min(8).max(500),
@@ -89,6 +109,13 @@ export const caseActionSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("answer_interrogation"), answer: z.string().trim().min(2).max(1000) }),
   z.object({ type: z.literal("save_case") }),
   z.object({ type: z.literal("retreat") }),
+  z.object({
+    type: z.literal("resolve_arcade_round"),
+    roundId: z.string().min(1).max(160),
+    collected: z.number().int().min(0).max(12),
+    hazardsHit: z.number().int().min(0).max(12),
+    skipped: z.boolean(),
+  }),
 ]);
 
 export const actionRequestSchema = z.object({

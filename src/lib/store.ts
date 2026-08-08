@@ -93,6 +93,23 @@ export async function getCase(ownerHash: string, id: string) {
   return normalizeLegacyLoreState(row.state);
 }
 
+export async function getCaseReplay(ownerHash: string, id: string, idempotencyKey: string) {
+  const db = getDatabase();
+  if (!db) {
+    const item = memoryCases.get(id);
+    const replay = memoryEvents.get(`${id}:${idempotencyKey}`);
+    if (!item || item.ownerHash !== ownerHash || !replay) return null;
+    return normalizeLegacyLoreState(item.state);
+  }
+  const [event] = await db.select({ id: caseEvents.id }).from(caseEvents).where(and(
+    eq(caseEvents.caseId, id),
+    eq(caseEvents.idempotencyKey, idempotencyKey),
+  )).limit(1);
+  if (!event) return null;
+  const [row] = await db.select().from(cases).where(and(eq(cases.id, id), eq(cases.ownerHash, ownerHash))).limit(1);
+  return row ? normalizeLegacyLoreState(row.state) : null;
+}
+
 export async function commitCase(input: {
   ownerHash: string;
   state: ExcuseState;

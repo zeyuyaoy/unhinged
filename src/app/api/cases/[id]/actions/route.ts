@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { applyFallbackAction } from "@/lib/chaos-engine";
+import { applyFallbackAction, ArcadeRoundConflictError, scheduleArcadeRound } from "@/lib/chaos-engine";
 import { applySeaLionAction, seaLionErrorDetails } from "@/lib/sea-lion";
 import { assessScenario } from "@/lib/safety";
 import { getDeviceIdentity } from "@/lib/session";
-import { commitCase, getCase, NotFoundError, VersionConflictError } from "@/lib/store";
+import { commitCase, getCase, getCaseReplay, NotFoundError, VersionConflictError } from "@/lib/store";
 import { actionRequestSchema } from "@/lib/types";
 
 function providerErrorCategory(error: unknown) {
@@ -32,6 +32,10 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   try {
     const current = await getCase(ownerHash, id);
+    const replay = await getCaseReplay(ownerHash, id, parsed.data.idempotencyKey);
+    if (replay) {
+      return NextResponse.json({ state: replay, source: replay.source, notice: "Repeated action safely replayed." });
+    }
     if (current.version !== parsed.data.expectedVersion) {
       return NextResponse.json({ code: "VERSION_CONFLICT", state: current }, { status: 409 });
     }
@@ -66,6 +70,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
         }
       }
     }
+    next = scheduleArcadeRound(next, parsed.data.action);
 
     const state = await commitCase({
       ownerHash,
@@ -88,6 +93,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           : "Generated with SEA-LION.",
     });
   } catch (error) {
+    if (error instanceof ArcadeRoundConflictError) {
+      return NextResponse.json({ code: "ARCADE_ROUND_CONFLICT", message: "That paperwork emergency is no longer active." }, { status: 409 });
+    }
     if (error instanceof VersionConflictError) return NextResponse.json({ code: "VERSION_CONFLICT" }, { status: 409 });
     if (error instanceof NotFoundError) return NextResponse.json({ code: "NOT_FOUND" }, { status: 404 });
     console.error("case_action_failed", { caseId: id, category: providerErrorCategory(error) });

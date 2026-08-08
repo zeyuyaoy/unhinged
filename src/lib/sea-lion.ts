@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
-import { applyFallbackAction, normalizeLegacyLoreState } from "@/lib/chaos-engine";
+import { applyFallbackAction, arcadeMetricModifiers, normalizeLegacyLoreState } from "@/lib/chaos-engine";
 import { containsUnsafeGeneratedClaim } from "@/lib/safety";
 import { loreTypeSchema, metricsSchema, type CaseAction, type ExcuseState } from "@/lib/types";
 
@@ -138,6 +138,7 @@ export async function applySeaLionAction(
     .map((result) => result.data)
     .filter((item) => !existingNames.has(item.name.toLowerCase()))
     .map((item, index) => ({ ...item, id: `AI-${deterministic.version}-${index + 1}` }));
+  const arcadeModifiers = arcadeMetricModifiers(deterministic.arcade);
 
   return {
     state: normalizeLegacyLoreState({
@@ -145,7 +146,11 @@ export async function applySeaLionAction(
       currentExcuse: parsed.excuse,
       lore: [...deterministic.lore, ...providerLore],
       claims: [...new Set([...deterministic.claims, ...parsed.claims])].slice(-12),
-      metrics: parsed.metrics,
+      metrics: {
+        ...parsed.metrics,
+        suspicion: Math.max(0, Math.min(100, parsed.metrics.suspicion + arcadeModifiers.suspicion)),
+        commitment: Math.max(0, Math.min(100, parsed.metrics.commitment + arcadeModifiers.commitment)),
+      },
       contradictions: [...new Set([...deterministic.contradictions, ...parsed.contradictions])],
       recommendation: parsed.recommendation.slice(0, 300),
       source: "live",

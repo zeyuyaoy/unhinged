@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   PRIMARY_LORE,
   PRIMARY_LORE_ID,
+  ArcadeRoundConflictError,
   applyFallbackAction,
+  arcadeMetricModifiers,
   chaosBand,
   clamp,
   createFallbackState,
   interrogationQuestions,
   normalizeLegacyLoreState,
+  scheduleArcadeRound,
 } from "@/lib/chaos-engine";
 import { assessScenario } from "@/lib/safety";
 
@@ -113,6 +116,54 @@ describe("chaos engine", () => {
     expect(normalized.currentExcuse).toContain("Emergency Backup Pigeon");
     expect(normalized.interrogation?.transcript[0].text).toContain("Emergency Backup Pigeon");
     expect(normalized.interrogation?.transcript[1].text).toBe("Raymond told me to say this.");
+    expect(normalizeLegacyLoreState(normalized)).toEqual(normalized);
+  });
+
+  it("queues one deterministic arcade round for each eligible critical action", () => {
+    const critical = { ...seed(), chaosLevel: 8, version: 9 };
+    const scheduled = scheduleArcadeRound(critical, { type: "add_detail" });
+    expect(scheduled.arcade.pendingRound).toEqual({
+      id: `${critical.id}:9:paperwork-panic`,
+      seed: expect.any(Number),
+      durationMs: 8000,
+      targetCount: 3,
+    });
+    expect(scheduleArcadeRound(scheduled, { type: "make_worse" }).arcade.pendingRound).toEqual(scheduled.arcade.pendingRound);
+    expect(scheduleArcadeRound({ ...critical, arcade: { ...critical.arcade, pendingRound: undefined } }, { type: "save_case" }).arcade.pendingRound).toBeUndefined();
+    const sameFlowDifferentCase = scheduleArcadeRound({ ...critical, id: "f1e71c2a-4d02-4327-86c5-c32070f534a4" }, { type: "add_detail" });
+    expect(sameFlowDifferentCase.arcade.pendingRound?.seed).toBe(scheduled.arcade.pendingRound?.seed);
+  });
+
+  it("resolves delivered, misfiled, and stale arcade rounds authoritatively", () => {
+    const critical = scheduleArcadeRound({ ...seed(), chaosLevel: 8, version: 4 }, { type: "make_worse" });
+    const roundId = critical.arcade.pendingRound?.id ?? "missing";
+    const delivered = applyFallbackAction(critical, { type: "resolve_arcade_round", roundId, collected: 3, hazardsHit: 1, skipped: false }, "local");
+    expect(delivered.arcade.deliveries).toBe(1);
+    expect(delivered.arcade.collectibles).toContain("Form 404: Deadline Not Found");
+    expect(delivered.arcade.pendingRound).toBeUndefined();
+    expect(arcadeMetricModifiers(delivered.arcade)).toEqual({ suspicion: -3, commitment: 3 });
+
+    const nextRound = scheduleArcadeRound({ ...delivered, chaosLevel: 9 }, { type: "add_lore" });
+    const misfiled = applyFallbackAction(nextRound, {
+      type: "resolve_arcade_round",
+      roundId: nextRound.arcade.pendingRound?.id ?? "missing",
+      collected: 1,
+      hazardsHit: 3,
+      skipped: false,
+    }, "local");
+    expect(misfiled.arcade.misfiles).toBe(1);
+    expect(misfiled.contradictions).toContain("Paperwork Panic misfiled another form before it reached the aquarium portal.");
+    expect(() => applyFallbackAction(misfiled, { type: "resolve_arcade_round", roundId, collected: 3, hazardsHit: 0, skipped: false }, "local"))
+      .toThrow(ArcadeRoundConflictError);
+  });
+
+  it("normalizes cases created before arcade state without changing their version", () => {
+    const current = seed();
+    const legacy = { ...current, version: 11 } as Partial<typeof current>;
+    delete legacy.arcade;
+    const normalized = normalizeLegacyLoreState(legacy as typeof current);
+    expect(normalized.version).toBe(11);
+    expect(normalized.arcade).toEqual({ roundsPlayed: 0, deliveries: 0, misfiles: 0, skips: 0, bestScore: 0, collectibles: [] });
     expect(normalizeLegacyLoreState(normalized)).toEqual(normalized);
   });
 });

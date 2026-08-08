@@ -25,18 +25,25 @@ import {
   Save,
   ShieldCheck,
   Sparkles,
+  Star,
   Sun,
   Trash2,
   UserRound,
   UsersRound,
+  Volume2,
+  VolumeX,
   X,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CHAOS_LABELS, PRIMARY_LORE_ID, UNIVERSE_LABELS, chaosBand, getPrimaryLore } from "@/lib/chaos-engine";
 import type { ActionResult, Audience, CaseAction, CaseSummary, ExcuseState, Genre, LoreObject, UserRole } from "@/lib/types";
+import { PaperworkPanic } from "@/components/PaperworkPanic";
+import { useAudioDirector } from "@/components/useAudioDirector";
 
 type Theme = "light" | "dark";
+type AudioDirector = ReturnType<typeof useAudioDirector>;
+const ACTIVE_CASE_KEY = "extrcuse-active-case";
 
 const examples = [
   { label: "Missed a deadline", value: "I need an excuse for missing my assignment." },
@@ -84,6 +91,7 @@ function AppHeader({
   onNewCase,
   onHistory,
   onMenu,
+  audio,
 }: {
   state: ExcuseState | null;
   theme: Theme;
@@ -91,6 +99,7 @@ function AppHeader({
   onNewCase: () => void;
   onHistory: () => void;
   onMenu: () => void;
+  audio: AudioDirector;
 }) {
   return (
     <header className="app-header">
@@ -105,6 +114,7 @@ function AppHeader({
         </>
       )}
       <nav className="header-actions" aria-label="Case actions">
+        <AudioControls audio={audio} />
         <button className="theme-toggle icon-button" onClick={onToggleTheme} aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}>
           {theme === "light" ? <Moon /> : <Sun />}
         </button>
@@ -112,6 +122,21 @@ function AppHeader({
         <button className="header-link" onClick={onHistory}><History /> History</button>
       </nav>
     </header>
+  );
+}
+
+function AudioControls({ audio, compact = false }: { audio: AudioDirector; compact?: boolean }) {
+  return (
+    <div className={`audio-controls ${compact ? "compact" : ""}`}>
+      <button className="audio-toggle" onClick={audio.toggleMuted} aria-label={audio.muted ? "Turn sound on" : "Mute sound"}>
+        {audio.muted ? <VolumeX /> : <Volume2 />}
+        <span>{audio.status === "armed" ? "Sound armed" : audio.muted ? "Sound off" : "Sound on"}</span>
+      </button>
+      <label>
+        <span className="sr-only">Sound volume</span>
+        <input type="range" min="0" max="1" step="0.05" value={audio.volume} onChange={(event) => audio.setVolume(Number(event.target.value))} aria-label="Sound volume" />
+      </label>
+    </div>
   );
 }
 
@@ -137,12 +162,14 @@ function ThemeShell({
   liveMessage,
   onNewCase,
   onHistory,
+  audio,
 }: {
   state: ExcuseState | null;
   children: React.ReactNode;
   liveMessage: string;
   onNewCase: () => void;
   onHistory: () => void;
+  audio: AudioDirector;
 }) {
   const { theme, toggle } = useTheme();
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -168,19 +195,44 @@ function ThemeShell({
       data-chaos={state ? chaosBand(state.chaosLevel) : "calm"}
       data-chaos-level={state?.chaosLevel ?? 0}
     >
-      <AppHeader state={state} theme={theme} onToggleTheme={toggle} onNewCase={onNewCase} onHistory={onHistory} onMenu={() => setMobileMenu((value) => !value)} />
+      <AppHeader state={state} theme={theme} onToggleTheme={toggle} onNewCase={onNewCase} onHistory={onHistory} onMenu={() => setMobileMenu((value) => !value)} audio={audio} />
       {mobileMenu && (
         <nav className="mobile-nav" aria-label="Mobile navigation">
           <button onClick={() => { onNewCase(); setMobileMenu(false); }}><FilePlus2 /> New case</button>
           <button onClick={() => { onHistory(); setMobileMenu(false); }}><History /> History</button>
           <button onClick={() => { toggle(); setMobileMenu(false); }}>{theme === "light" ? <Moon /> : <Sun />} {theme === "light" ? "Dark" : "Light"} theme</button>
+          <AudioControls audio={audio} compact />
         </nav>
       )}
       <SafetyBar critical={critical} />
       <div className="sr-only" aria-live="polite" aria-atomic="true">{liveMessage}</div>
       {children}
+      <CursorSparkTrail enabled={Boolean(state && state.chaosLevel >= 6)} />
+      {audio.caption && <div className="sound-caption" role="status"><Volume2 /> {audio.caption}</div>}
     </div>
   );
+}
+
+function CursorSparkTrail({ enabled }: { enabled: boolean }) {
+  const [sparks, setSparks] = useState<Array<{ id: number; x: number; y: number }>>([]);
+  const lastTime = useRef(0);
+  useEffect(() => {
+    if (!enabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches || window.matchMedia("(pointer: coarse)").matches) {
+      const frame = window.requestAnimationFrame(() => setSparks([]));
+      return () => window.cancelAnimationFrame(frame);
+    }
+    const onMove = (event: PointerEvent) => {
+      const now = performance.now();
+      if (now - lastTime.current < 75) return;
+      lastTime.current = now;
+      const spark = { id: Math.floor(now * 10), x: event.clientX, y: event.clientY };
+      setSparks((items) => [...items.slice(-5), spark]);
+      window.setTimeout(() => setSparks((items) => items.filter((item) => item.id !== spark.id)), 520);
+    };
+    window.addEventListener("pointermove", onMove);
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [enabled]);
+  return <div className="cursor-spark-trail" aria-hidden="true">{sparks.map((spark) => <Sparkles key={spark.id} style={{ left: spark.x, top: spark.y }} />)}</div>;
 }
 
 function CreationView({
@@ -341,6 +393,13 @@ function CaseRail({ state, collapsed, onToggle }: { state: ExcuseState; collapse
           </section>
           <section className="universe-scope"><span className="eyebrow">Universe scope</span><p><Globe2 /> {UNIVERSE_LABELS[state.universeLevel]}</p></section>
           {state.chaosLevel >= 6 && primaryLore && <p className="anchor-detected"><Bird /> {primaryLore.name} detected</p>}
+          {state.arcade.collectibles.length > 0 && (
+            <section className="sticker-album" aria-labelledby="sticker-album-title">
+              <span className="eyebrow" id="sticker-album-title">Paperwork sticker album</span>
+              <div>{state.arcade.collectibles.map((item) => <span key={item}><Star /> {item}</span>)}</div>
+              <small>Best score {state.arcade.bestScore}</small>
+            </section>
+          )}
         </>
       )}
     </aside>
@@ -387,6 +446,13 @@ function WorkspaceView({ state, busy, onAction }: { state: ExcuseState; busy: bo
           </div>
         </div>
       )}
+      {critical && (
+        <div className="y2k-decorations" aria-hidden="true">
+          <div className="y2k-popup reality-popup"><span>Reality Check v9.0 <X /></span><p>Metrics are off the charts.</p><b>OK-ish</b></div>
+          <div className="y2k-popup pigeon-popup"><span>Pigeon Comms <X /></span><p>Coop? Affirmative.<br />Mulch crumbs acquired.</p><i><em /></i></div>
+          <div className="visitor-counter"><span>Visitors</span><strong>{String(state.caseNumber * 7919 + state.version * 404).padStart(8, "0")}</strong></div>
+        </div>
+      )}
       <Recommendation state={state} />
     </main>
   );
@@ -418,6 +484,12 @@ function InterrogationView({ state, busy, onAction }: { state: ExcuseState; busy
         <div className="question-progress" aria-label={`Question ${questionNumber} of 5`}>
           {[1, 2, 3, 4, 5].map((number) => <span key={number} className={number < questionNumber ? "complete" : number === questionNumber ? "current" : ""}>{number < questionNumber ? <Check /> : number}</span>)}
         </div>
+        {state.chaosLevel >= 8 && (
+          <section className="interrogation-boss-hud" aria-label="Interrogation boss status">
+            <div><span>Suspicion boss health</span><strong>{state.metrics.suspicion}%</strong><i><b style={{ width: `${state.metrics.suspicion}%` }} /></i></div>
+            <div><span>Paperwork integrity</span><strong>{state.metrics.believability}%</strong><i><b style={{ width: `${state.metrics.believability}%` }} /></i></div>
+          </section>
+        )}
         <div className="evidence-trail"><span className="eyebrow">Evidence trail</span><div>{(evidence.length ? evidence : [{ id: "base", type: "event" as const, name: "Transport delay", role: "Claim", description: "", importance: 0.5 }]).map((item) => <div key={item.id}><BookOpen /> {item.name}</div>)}</div></div>
         <blockquote>{interrogation.currentQuestion}</blockquote>
         <label className="answer-field">Your answer
@@ -465,6 +537,7 @@ function HistoryDrawer({ cases, onClose, onOpen, onClear }: { cases: CaseSummary
 }
 
 export function MaximumExtraApp() {
+  const audio = useAudioDirector();
   const [state, setState] = useState<ExcuseState | null>(null);
   const [recentCases, setRecentCases] = useState<CaseSummary[]>([]);
   const [busy, setBusy] = useState(false);
@@ -479,13 +552,29 @@ export function MaximumExtraApp() {
 
   useEffect(() => {
     let active = true;
-    void fetch("/api/cases", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : null)
-      .then((payload) => { if (active && payload) setRecentCases(payload.cases); });
+    const activeCaseId = window.localStorage.getItem(ACTIVE_CASE_KEY);
+    void Promise.all([
+      fetch("/api/cases", { cache: "no-store" })
+        .then((response) => response.ok ? response.json() : null),
+      activeCaseId
+        ? fetch(`/api/cases/${activeCaseId}`, { cache: "no-store" })
+          .then((response) => response.ok ? response.json() : null)
+        : Promise.resolve(null),
+    ]).then(([casesPayload, casePayload]) => {
+      if (!active) return;
+      if (casesPayload) setRecentCases(casesPayload.cases);
+      if (casePayload?.state) {
+        setState(casePayload.state);
+        setNotice(casePayload.state.arcade.pendingRound ? "Pending paperwork recovered." : "Case restored.");
+      } else if (activeCaseId) {
+        window.localStorage.removeItem(ACTIVE_CASE_KEY);
+      }
+    });
     return () => { active = false; };
   }, []);
 
   async function createCase(input: { scenario: string; audience: Audience; userRole: UserRole; genre: Genre; startingChaos: number }) {
+    audio.activateForAction(input.startingChaos);
     setBusy(true);
     setNotice("Generating a harmless excuse…");
     try {
@@ -493,6 +582,7 @@ export function MaximumExtraApp() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message ?? "Could not create the case.");
       setState(payload.state);
+      window.localStorage.setItem(ACTIVE_CASE_KEY, payload.state.id);
       setNotice(payload.notice);
       await refreshCases();
     } catch (error) {
@@ -505,7 +595,9 @@ export function MaximumExtraApp() {
     try {
       const response = await fetch(`/api/cases/${id}`, { cache: "no-store" });
       if (!response.ok) throw new Error("That case could not be opened.");
-      setState((await response.json()).state);
+      const restored = (await response.json()).state;
+      setState(restored);
+      window.localStorage.setItem(ACTIVE_CASE_KEY, restored.id);
       setNotice("Case restored.");
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not open the case."); }
     finally { setBusy(false); }
@@ -513,8 +605,13 @@ export function MaximumExtraApp() {
 
   async function act(action: CaseAction) {
     if (!state || busy) return;
+    if (action.type !== "resolve_arcade_round") audio.activateForAction(state.chaosLevel);
     setBusy(true);
-    setNotice(action.type === "answer_interrogation" ? "Checking your timeline…" : "Dispatching the Emergency Backup Pigeon…");
+    setNotice(action.type === "answer_interrogation"
+      ? "Checking your timeline…"
+      : action.type === "resolve_arcade_round"
+        ? "Filing the arcade paperwork…"
+        : "Dispatching the Emergency Backup Pigeon…");
     try {
       const response = await fetch(`/api/cases/${state.id}/actions`, {
         method: "POST",
@@ -528,6 +625,7 @@ export function MaximumExtraApp() {
       }
       if (!response.ok) throw new Error(payload.message ?? "The action could not be completed.");
       const result = payload as ActionResult;
+      if (!state.finalJudgment && result.state.finalJudgment) audio.play("judgment", result.state.chaosLevel);
       setState(result.state);
       setNotice(result.notice ?? "Case updated.");
       await refreshCases();
@@ -540,6 +638,7 @@ export function MaximumExtraApp() {
       const response = await fetch("/api/cases", { method: "DELETE" });
       if (!response.ok) throw new Error("Case history could not be cleared.");
       setState(null);
+      window.localStorage.removeItem(ACTIVE_CASE_KEY);
       setHistoryOpen(false);
       setNotice("Case history cleared.");
       await refreshCases();
@@ -550,10 +649,23 @@ export function MaximumExtraApp() {
 
   const isInterrogating = Boolean(state?.interrogation?.active);
   return (
-    <ThemeShell state={state} liveMessage={notice} onNewCase={() => { setState(null); setNotice("New case ready."); }} onHistory={() => setHistoryOpen(true)}>
+    <ThemeShell state={state} liveMessage={notice} onNewCase={() => { window.localStorage.removeItem(ACTIVE_CASE_KEY); setState(null); setNotice("New case ready."); }} onHistory={() => setHistoryOpen(true)} audio={audio}>
       {!state ? <CreationView recentCases={recentCases} onCreate={createCase} onOpen={openCase} busy={busy} /> : isInterrogating ? <InterrogationView state={state} busy={busy} onAction={act} /> : <WorkspaceView state={state} busy={busy} onAction={act} />}
       {notice && <div className={`toast ${notice.toLowerCase().includes("fallback") ? "fallback-toast" : ""}`} role="region" aria-label="Status notification"><Sparkles /><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss notification"><X /></button></div>}
       {historyOpen && <HistoryDrawer cases={recentCases} onClose={closeHistory} onOpen={openCase} onClear={clearHistory} />}
+      {state?.arcade.pendingRound && (
+        <PaperworkPanic
+          round={state.arcade.pendingRound}
+          chaosLevel={state.chaosLevel}
+          suspicion={state.metrics.suspicion}
+          believability={state.metrics.believability}
+          busy={busy}
+          onResolve={act}
+          onStartAudio={audio.startArcade}
+          onStopAudio={audio.stopArcade}
+          onPlayCue={audio.play}
+        />
+      )}
     </ThemeShell>
   );
 }
