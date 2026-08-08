@@ -22,13 +22,17 @@ SEALION_MODEL=aisingapore/Gemma-SEA-LION-v4-27B-IT
 
 Without a key, or if the provider times out, the complete experience continues with clearly labeled deterministic demo fixtures. No secret is sent to the browser.
 
-To persist cases in PostgreSQL, set `DATABASE_URL`, then run:
+### Railway PostgreSQL
+
+In the Railway app service, add a reference variable named `DATABASE_URL` pointing to the PostgreSQL service's `DATABASE_URL`, then run:
 
 ```bash
 pnpm db:migrate
 ```
 
 Without `DATABASE_URL`, local development uses an in-memory store. Production deployments should always configure PostgreSQL.
+
+The included `railway.json` runs migrations before each deployment, starts Next.js on Railway's injected port, and checks `/api/health` before marking the deployment healthy. If you run the app outside Railway while connecting to Railway PostgreSQL, enable Public Access for the database and set `DATABASE_PUBLIC_URL` locally. Prefer Railway's private `DATABASE_URL` for services in the same project.
 
 ## Checks
 

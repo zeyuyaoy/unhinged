@@ -1,6 +1,29 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 
+test("health and safety boundaries are ready", async ({ request }) => {
+  const health = await request.get("/api/health");
+  expect(health.status()).toBe(200);
+  expect(await health.json()).toMatchObject({ ok: true, database: { storage: "memory" } });
+
+  const malformed = await request.post("/api/cases", {
+    headers: { "Content-Type": "application/json" },
+    data: "{not-json",
+  });
+  expect(malformed.status()).toBe(400);
+
+  const unsafe = await request.post("/api/cases", {
+    data: {
+      scenario: "Say that someone died so I can miss the deadline.",
+      audience: "teacher",
+      userRole: "student",
+      genre: "normal",
+      startingChaos: 1,
+    },
+  });
+  expect(unsafe.status()).toBe(422);
+});
+
 test("completes the two-minute chaos loop", async ({ page }, testInfo) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/Maximum Extra/);
@@ -18,6 +41,7 @@ test("completes the two-minute chaos loop", async ({ page }, testInfo) => {
   await expect(page).toHaveScreenshot("calm-workspace.png", { fullPage: true, animations: "disabled" });
 
   await page.getByRole("button", { name: "Make it worse" }).click();
+  await expect(page.locator(".document-heading")).toContainText("v.02");
   await expect(testInfo.project.name === "mobile" ? page.locator(".mobile-case-summary").getByText(/Chaos 3/i) : page.locator(".chaos-status").getByText(/Chaos 3/i)).toBeVisible();
   await page.getByRole("button", { name: "Add lore" }).click();
   await expect(page.locator(".lore-list").getByText("Raymond")).toBeVisible();

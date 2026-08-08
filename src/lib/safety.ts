@@ -4,6 +4,7 @@ const blockedPatterns = [
   /(impersonate|pretend to be) (the )?(police|doctor|government|bank|teacher)/i,
   /(insurance|bank|payment|refund|financial) fraud/i,
   /(bomb|hostage|kidnap|murder|suicide) excuse/i,
+  /\b(died|death|funeral|hospitali[sz]ed|cancer|heart attack|stroke|arrested|police report|medical certificate)\b/i,
 ];
 
 export interface SafetyAssessment {

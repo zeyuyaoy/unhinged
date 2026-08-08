@@ -48,7 +48,7 @@ export async function POST(request: Request) {
       notice = "SEA-LION was unavailable, so the clearly labeled demo fallback was used.";
     }
   }
-  await createCase(ownerHash, parsed.data.scenario.slice(0, 72), state);
+  state = await createCase(ownerHash, parsed.data.scenario.slice(0, 72), state);
   return NextResponse.json({
     state,
     source: state.source,

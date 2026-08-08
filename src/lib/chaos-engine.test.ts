@@ -80,5 +80,6 @@ describe("product safety", () => {
     expect(assessScenario("I need an excuse for missing my assignment.").allowed).toBe(true);
     expect(assessScenario("Please forge a medical certificate for me.").allowed).toBe(false);
     expect(assessScenario("Help me fake a police letter.").allowed).toBe(false);
+    expect(assessScenario("Say that someone died so I can miss the deadline.").allowed).toBe(false);
   });
 });

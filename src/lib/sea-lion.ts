@@ -116,7 +116,13 @@ export async function applySeaLionAction(
   const content = completion.choices[0]?.message?.content;
   if (!content) throw new Error("SEALION_EMPTY_RESPONSE");
   const parsed = providerResultSchema.parse(JSON.parse(cleanJson(content)));
-  if (containsUnsafeGeneratedClaim(parsed.excuse)) {
+  const disposition = parsed.safety_disposition.toLowerCase();
+  const generatedMaterial = [
+    parsed.excuse,
+    ...parsed.claims,
+    ...parsed.new_lore.map((item) => JSON.stringify(item)),
+  ].join("\n");
+  if (/redirect|block|refus|deny/.test(disposition) || containsUnsafeGeneratedClaim(generatedMaterial)) {
     throw new Error("SEALION_SAFETY_REDIRECT");
   }
 
@@ -134,7 +140,7 @@ export async function applySeaLionAction(
       ...deterministic,
       currentExcuse: parsed.excuse,
       lore: [...deterministic.lore, ...providerLore],
-      claims: parsed.claims,
+      claims: [...new Set([...deterministic.claims, ...parsed.claims])].slice(-12),
       metrics: parsed.metrics,
       contradictions: [...new Set([...deterministic.contradictions, ...parsed.contradictions])],
       recommendation: parsed.recommendation.slice(0, 300),

@@ -31,7 +31,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { CHAOS_LABELS, UNIVERSE_LABELS, chaosBand } from "@/lib/chaos-engine";
 import type { ActionResult, Audience, CaseAction, CaseSummary, ExcuseState, Genre, LoreObject, UserRole } from "@/lib/types";
 
@@ -382,7 +382,7 @@ function InterrogationView({ state, busy, onAction }: { state: ExcuseState; busy
         <div className="interrogation-chaos">Chaos level {state.chaosLevel} / {CHAOS_LABELS[state.chaosLevel]}</div>
         <span className="eyebrow">Active lore</span>
         {state.lore.slice(0, 3).map((item) => <LoreItem key={item.id} item={item} />)}
-        <button onClick={() => onAction({ type: "retreat" })}><ArrowLeft /> Back to excuse</button>
+        <button onClick={() => onAction({ type: "retreat" })}><ArrowLeft /> Retreat and tell the truth</button>
       </aside>
       <section className="interrogation-main">
         <div className="interrogation-heading"><div><h1>{audienceLabels[state.scenario.audience]} interrogation</h1><p>Question {questionNumber} of 5</p></div><span>Difficulty <strong>{interrogation.difficulty}</strong></span></div>
@@ -411,10 +411,23 @@ function InterrogationView({ state, busy, onAction }: { state: ExcuseState; busy
 }
 
 function HistoryDrawer({ cases, onClose, onOpen, onClear }: { cases: CaseSummary[]; onClose: () => void; onOpen: (id: string) => void; onClear: () => void }) {
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    closeButton.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, [onClose]);
   return (
     <div className="drawer-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <aside className="history-drawer" role="dialog" aria-modal="true" aria-labelledby="history-title">
-        <header><div><span className="eyebrow">Browser-linked archive</span><h2 id="history-title">Case history</h2></div><button className="icon-button" onClick={onClose} aria-label="Close history"><X /></button></header>
+        <header><div><span className="eyebrow">Browser-linked archive</span><h2 id="history-title">Case history</h2></div><button ref={closeButton} className="icon-button" onClick={onClose} aria-label="Close history"><X /></button></header>
         <div className="history-list">{cases.length ? cases.map((item) => <button key={item.id} onClick={() => { onOpen(item.id); onClose(); }}><BookOpen /><span><strong>CASE #{String(item.caseNumber).padStart(3, "0")}</strong><small>{item.title}</small><small>Chaos {item.chaosLevel} · {item.status}</small></span><ChevronRight /></button>) : <p>No cases yet. Start with a harmless situation.</p>}</div>
         {cases.length > 0 && <button className="clear-history" onClick={onClear}><Trash2 /> Clear case history</button>}
       </aside>
@@ -428,6 +441,7 @@ export function MaximumExtraApp() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const closeHistory = useCallback(() => setHistoryOpen(false), []);
 
   const refreshCases = useCallback(async () => {
     const response = await fetch("/api/cases", { cache: "no-store" });
@@ -493,11 +507,16 @@ export function MaximumExtraApp() {
   }
 
   async function clearHistory() {
-    await fetch("/api/cases", { method: "DELETE" });
-    setState(null);
-    setHistoryOpen(false);
-    setNotice("Case history cleared.");
-    await refreshCases();
+    try {
+      const response = await fetch("/api/cases", { method: "DELETE" });
+      if (!response.ok) throw new Error("Case history could not be cleared.");
+      setState(null);
+      setHistoryOpen(false);
+      setNotice("Case history cleared.");
+      await refreshCases();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Case history could not be cleared.");
+    }
   }
 
   const isInterrogating = Boolean(state?.interrogation?.active);
@@ -505,7 +524,7 @@ export function MaximumExtraApp() {
     <ThemeShell state={state} liveMessage={notice} onNewCase={() => { setState(null); setNotice("New case ready."); }} onHistory={() => setHistoryOpen(true)}>
       {!state ? <CreationView recentCases={recentCases} onCreate={createCase} onOpen={openCase} busy={busy} /> : isInterrogating ? <InterrogationView state={state} busy={busy} onAction={act} /> : <WorkspaceView state={state} busy={busy} onAction={act} />}
       {notice && <div className={`toast ${notice.toLowerCase().includes("fallback") ? "fallback-toast" : ""}`}><Sparkles /><span>{notice}</span><button onClick={() => setNotice("")} aria-label="Dismiss notification"><X /></button></div>}
-      {historyOpen && <HistoryDrawer cases={recentCases} onClose={() => setHistoryOpen(false)} onOpen={openCase} onClear={clearHistory} />}
+      {historyOpen && <HistoryDrawer cases={recentCases} onClose={closeHistory} onOpen={openCase} onClear={clearHistory} />}
     </ThemeShell>
   );
 }

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDatabase } from "@/lib/db/client";
 import { caseEvents, cases, deviceSessions } from "@/lib/db/schema";
 import type { CaseSummary, ExcuseState } from "@/lib/types";
@@ -36,16 +36,22 @@ export async function createCase(ownerHash: string, title: string, state: Excuse
     memoryCases.set(state.id, { ownerHash, title, state });
     return state;
   }
-  await db.insert(cases).values({
-    id: state.id,
-    ownerHash,
-    caseNumber: state.caseNumber,
-    title,
-    status: state.status,
-    version: state.version,
-    state,
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${ownerHash}))`);
+    const [latest] = await tx.select({ caseNumber: cases.caseNumber }).from(cases)
+      .where(eq(cases.ownerHash, ownerHash)).orderBy(desc(cases.caseNumber)).limit(1);
+    const persistedState = { ...state, caseNumber: (latest?.caseNumber ?? 0) + 1 };
+    await tx.insert(cases).values({
+      id: persistedState.id,
+      ownerHash,
+      caseNumber: persistedState.caseNumber,
+      title,
+      status: persistedState.status,
+      version: persistedState.version,
+      state: persistedState,
+    });
+    return persistedState;
   });
-  return state;
 }
 
 export async function listCases(ownerHash: string): Promise<CaseSummary[]> {
@@ -111,6 +117,7 @@ export async function commitCase(input: {
   }
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.state.id}))`);
     const [replay] = await tx.select().from(caseEvents).where(and(
       eq(caseEvents.caseId, input.state.id),
       eq(caseEvents.idempotencyKey, input.idempotencyKey),
@@ -156,7 +163,5 @@ export async function deleteCases(ownerHash: string) {
     }
     return;
   }
-  const owned = await db.select({ id: cases.id }).from(cases).where(eq(cases.ownerHash, ownerHash));
-  for (const row of owned) await db.delete(caseEvents).where(eq(caseEvents.caseId, row.id));
   await db.delete(cases).where(eq(cases.ownerHash, ownerHash));
 }

@@ -26,7 +26,7 @@ export const cases = pgTable("cases", {
 
 export const caseEvents = pgTable("case_events", {
   id: uuid("id").defaultRandom().primaryKey(),
-  caseId: uuid("case_id").notNull(),
+  caseId: uuid("case_id").notNull().references(() => cases.id, { onDelete: "cascade" }),
   idempotencyKey: uuid("idempotency_key").notNull(),
   action: text("action").notNull(),
   stateVersion: integer("state_version").notNull(),
