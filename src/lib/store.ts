@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDatabase } from "@/lib/db/client";
 import { caseEvents, cases, deviceSessions } from "@/lib/db/schema";
+import { normalizeLegacyLoreState } from "@/lib/chaos-engine";
 import type { CaseSummary, ExcuseState } from "@/lib/types";
 
 const memoryCases = new Map<string, { ownerHash: string; title: string; state: ExcuseState }>();
@@ -85,11 +86,11 @@ export async function getCase(ownerHash: string, id: string) {
   if (!db) {
     const item = memoryCases.get(id);
     if (!item || item.ownerHash !== ownerHash) throw new NotFoundError();
-    return item.state;
+    return normalizeLegacyLoreState(item.state);
   }
   const [row] = await db.select().from(cases).where(and(eq(cases.id, id), eq(cases.ownerHash, ownerHash))).limit(1);
   if (!row) throw new NotFoundError();
-  return row.state;
+  return normalizeLegacyLoreState(row.state);
 }
 
 export async function commitCase(input: {

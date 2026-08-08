@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
-import { applyFallbackAction } from "@/lib/chaos-engine";
+import { applyFallbackAction, normalizeLegacyLoreState } from "@/lib/chaos-engine";
 import { containsUnsafeGeneratedClaim } from "@/lib/safety";
 import { loreTypeSchema, metricsSchema, type CaseAction, type ExcuseState } from "@/lib/types";
 
@@ -55,7 +55,7 @@ export function seaLionErrorDetails(error: unknown) {
   return { category: "unknown" };
 }
 
-function promptFor(state: ExcuseState, action: ProviderAction) {
+export function promptFor(state: ExcuseState, action: ProviderAction) {
   return `You are Extrcuse Generater, a Singapore-context creative comedy engine. This is fictional entertainment, not a real-world deception assistant.
 
 GENERATOR ROLE
@@ -86,6 +86,10 @@ AUTHORITATIVE STATE: ${JSON.stringify({
   })}`;
 }
 
+export function prepareProviderState(state: ExcuseState, action: ProviderAction) {
+  return action.type === "initial" ? state : applyFallbackAction(state, action);
+}
+
 export async function applySeaLionAction(
   state: ExcuseState,
   action: ProviderAction,
@@ -103,13 +107,14 @@ export async function applySeaLionAction(
     maxRetries: 0,
     defaultHeaders: { "X-Safety-Identifier": safetyIdentifier },
   });
+  const deterministic = prepareProviderState(state, action);
   const completion = await client.chat.completions.create({
     model: process.env.SEALION_MODEL ?? "aisingapore/Gemma-SEA-LION-v4-27B-IT",
     messages: [
       { role: "system", content: "Follow the response contract exactly. Output JSON only." },
-      { role: "user", content: promptFor(state, action) },
+      { role: "user", content: promptFor(deterministic, action) },
     ],
-    temperature: Math.min(1, 0.35 + state.chaosLevel * 0.06),
+    temperature: Math.min(1, 0.35 + deterministic.chaosLevel * 0.06),
     max_tokens: 700,
     response_format: { type: "json_object" },
   });
@@ -126,7 +131,6 @@ export async function applySeaLionAction(
     throw new Error("SEALION_SAFETY_REDIRECT");
   }
 
-  const deterministic = action.type === "initial" ? state : applyFallbackAction(state, action);
   const existingNames = new Set(deterministic.lore.map((item) => item.name.toLowerCase()));
   const providerLore = parsed.new_lore
     .map((item) => providerLoreSchema.safeParse(item))
@@ -136,7 +140,7 @@ export async function applySeaLionAction(
     .map((item, index) => ({ ...item, id: `AI-${deterministic.version}-${index + 1}` }));
 
   return {
-    state: {
+    state: normalizeLegacyLoreState({
       ...deterministic,
       currentExcuse: parsed.excuse,
       lore: [...deterministic.lore, ...providerLore],
@@ -145,7 +149,7 @@ export async function applySeaLionAction(
       contradictions: [...new Set([...deterministic.contradictions, ...parsed.contradictions])],
       recommendation: parsed.recommendation.slice(0, 300),
       source: "live",
-    },
+    }),
     tokenUsage: completion.usage?.total_tokens,
   };
 }

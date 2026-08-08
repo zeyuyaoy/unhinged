@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
+  Bird,
   Bookmark,
   BookOpen,
   Check,
@@ -32,7 +33,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { CHAOS_LABELS, UNIVERSE_LABELS, chaosBand } from "@/lib/chaos-engine";
+import { CHAOS_LABELS, PRIMARY_LORE_ID, UNIVERSE_LABELS, chaosBand, getPrimaryLore } from "@/lib/chaos-engine";
 import type { ActionResult, Audience, CaseAction, CaseSummary, ExcuseState, Genre, LoreObject, UserRole } from "@/lib/types";
 
 type Theme = "light" | "dark";
@@ -145,9 +146,28 @@ function ThemeShell({
 }) {
   const { theme, toggle } = useTheme();
   const [mobileMenu, setMobileMenu] = useState(false);
+  const shellRef = useRef<HTMLDivElement>(null);
   const critical = Boolean(state && state.chaosLevel >= 8);
+  const stateVersion = state?.version;
+  useEffect(() => {
+    const shell = shellRef.current;
+    if (!shell || stateVersion === undefined) return;
+    shell.classList.remove("is-chaos-burst");
+    const frame = window.requestAnimationFrame(() => shell.classList.add("is-chaos-burst"));
+    const timeout = window.setTimeout(() => shell.classList.remove("is-chaos-burst"), 900);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+      shell.classList.remove("is-chaos-burst");
+    };
+  }, [stateVersion]);
   return (
-    <div className="app-shell" data-chaos={state ? chaosBand(state.chaosLevel) : "calm"}>
+    <div
+      ref={shellRef}
+      className="app-shell"
+      data-chaos={state ? chaosBand(state.chaosLevel) : "calm"}
+      data-chaos-level={state?.chaosLevel ?? 0}
+    >
       <AppHeader state={state} theme={theme} onToggleTheme={toggle} onNewCase={onNewCase} onHistory={onHistory} onMenu={() => setMobileMenu((value) => !value)} />
       {mobileMenu && (
         <nav className="mobile-nav" aria-label="Mobile navigation">
@@ -295,11 +315,13 @@ function DnaPanel({ state }: { state: ExcuseState }) {
 }
 
 function LoreItem({ item }: { item: LoreObject }) {
-  const icon = item.type === "character" ? <UserRound /> : item.type === "organization" ? <UsersRound /> : item.type === "object" ? <Bookmark /> : <BookOpen />;
-  return <div className="lore-item">{icon}<span><strong>{item.name}</strong><small>{item.role}</small></span></div>;
+  const isPrimaryLore = item.id === PRIMARY_LORE_ID;
+  const icon = isPrimaryLore ? <Bird /> : item.type === "character" ? <UserRound /> : item.type === "organization" ? <UsersRound /> : item.type === "object" ? <Bookmark /> : <BookOpen />;
+  return <div className={`lore-item ${isPrimaryLore ? "primary-lore" : ""}`}><span className="lore-icon">{icon}</span><span><strong>{item.name}</strong><small>{item.role}</small></span></div>;
 }
 
 function CaseRail({ state, collapsed, onToggle }: { state: ExcuseState; collapsed: boolean; onToggle: () => void }) {
+  const primaryLore = getPrimaryLore(state);
   return (
     <aside className={`case-rail ${collapsed ? "collapsed" : ""}`} aria-label="Case state">
       <button className="rail-toggle icon-button" onClick={onToggle} aria-label={collapsed ? "Show case state" : "Hide case state"}>{collapsed ? <ChevronRight /> : <ArrowLeft />}</button>
@@ -318,7 +340,7 @@ function CaseRail({ state, collapsed, onToggle }: { state: ExcuseState; collapse
             <strong>{state.chaosLevel} — {CHAOS_LABELS[state.chaosLevel]}</strong>
           </section>
           <section className="universe-scope"><span className="eyebrow">Universe scope</span><p><Globe2 /> {UNIVERSE_LABELS[state.universeLevel]}</p></section>
-          {state.chaosLevel >= 6 && state.lore.some((item) => item.name === "Raymond") && <p className="raymond-detected"><AlertTriangle /> Raymond detected</p>}
+          {state.chaosLevel >= 6 && primaryLore && <p className="anchor-detected"><Bird /> {primaryLore.name} detected</p>}
         </>
       )}
     </aside>
@@ -346,18 +368,25 @@ function WorkspaceView({ state, busy, onAction }: { state: ExcuseState; busy: bo
             <section className="final-judgment"><Sparkles /><span><small>Final AI judgment</small><strong>{state.finalJudgment}</strong></span></section>
           ) : (
             <div className="action-grid">
-              <button className="make-worse" disabled={busy} onClick={() => onAction({ type: "make_worse" })}><Zap /> {busy ? "Making it worse…" : "Make it worse"}</button>
-              <button disabled={busy} onClick={() => onAction({ type: "add_lore" })}><FolderPlus /> Add lore</button>
-              <button disabled={busy} onClick={() => onAction({ type: "add_detail" })}><ListPlus /> Add detail</button>
-              <button disabled={busy} onClick={() => onAction({ type: "escalate_universe" })}><Globe2 /> Escalate universe</button>
-              <button disabled={busy} onClick={() => onAction({ type: "begin_interrogation" })}><MessageCircleQuestion /> Interrogate me</button>
-              <button disabled={busy} onClick={() => onAction({ type: "save_case" })}><Save /> {state.status === "saved" ? "Case saved" : "Save case"}</button>
+              <button className="make-worse" disabled={busy} onClick={() => onAction({ type: "make_worse" })}><span className="action-icon"><Zap /></span> {busy ? "Making it worse…" : "Make it worse"}</button>
+              <button disabled={busy} onClick={() => onAction({ type: "add_lore" })}><span className="action-icon"><FolderPlus /></span> Add lore</button>
+              <button disabled={busy} onClick={() => onAction({ type: "add_detail" })}><span className="action-icon"><ListPlus /></span> Add detail</button>
+              <button disabled={busy} onClick={() => onAction({ type: "escalate_universe" })}><span className="action-icon"><Globe2 /></span> Escalate universe</button>
+              <button disabled={busy} onClick={() => onAction({ type: "begin_interrogation" })}><span className="action-icon"><MessageCircleQuestion /></span> Interrogate me</button>
+              <button disabled={busy} onClick={() => onAction({ type: "save_case" })}><span className="action-icon"><Save /></span> {state.status === "saved" ? "Case saved" : "Save case"}</button>
             </div>
           )}
         </section>
         <DnaPanel state={state} />
       </div>
-      {critical && <div className="chaos-ticker"><strong>LIVE</strong><span>Raymond sighted near coastal aquarium facility</span><span>Bus status: non-vehicular</span><span>Jurisdiction: aquatic</span></div>}
+      {critical && (
+        <div className="chaos-ticker" aria-label="Live chaos status: Emergency Backup Pigeon dispatched from the aquarium. Bus status non-vehicular. Jurisdiction aquatic.">
+          <div className="chaos-ticker-track">
+            <span className="ticker-set"><strong>LIVE</strong><span>Emergency Backup Pigeon dispatched from aquarium</span><span>Bus status: non-vehicular</span><span>Jurisdiction: aquatic</span></span>
+            <span className="ticker-set" aria-hidden="true"><strong>LIVE</strong><span>Emergency Backup Pigeon dispatched from aquarium</span><span>Bus status: non-vehicular</span><span>Jurisdiction: aquatic</span></span>
+          </div>
+        </div>
+      )}
       <Recommendation state={state} />
     </main>
   );
@@ -402,7 +431,7 @@ function InterrogationView({ state, busy, onAction }: { state: ExcuseState; busy
       </section>
       <aside className="interrogation-insights" aria-label="Interrogation analysis">
         <section className="suspicion-card"><span>Suspicion</span><strong>{state.metrics.suspicion}%</strong><div className="meter"><span style={{ width: `${state.metrics.suspicion}%` }} /></div><p>{state.metrics.suspicion > 80 ? "High suspicion" : "Building suspicion"}</p></section>
-        <section className="consistency-card"><h2><Lightbulb /> Lore consistency check</h2><strong>{Math.max(2, state.contradictions.length)} claims at risk</strong>{state.contradictions.length ? <ul>{state.contradictions.map((item) => <li key={item}>{item}</li>)}</ul> : <ul><li>Raymond’s location and possession of the file overlap.</li><li>The delay timeline is increasingly difficult to verify.</li></ul>}</section>
+        <section className="consistency-card"><h2><Lightbulb /> Lore consistency check</h2><strong>{Math.max(2, state.contradictions.length)} claims at risk</strong>{state.contradictions.length ? <ul>{state.contradictions.map((item) => <li key={item}>{item}</li>)}</ul> : <ul><li>The pigeon’s aquarium dispatch and custody timeline overlap.</li><li>The delay timeline is increasingly difficult to verify.</li></ul>}</section>
         <section className="interrogation-log"><h2>Interrogation log</h2>{interrogation.transcript.map((item, index) => <div key={item.id}><span>{item.speaker === "interrogator" ? `Q${Math.ceil((index + 1) / 2)}` : `A${Math.ceil((index + 1) / 2)}`}</span><p>{item.text}</p></div>)}</section>
       </aside>
       <Recommendation state={state} />
@@ -485,7 +514,7 @@ export function MaximumExtraApp() {
   async function act(action: CaseAction) {
     if (!state || busy) return;
     setBusy(true);
-    setNotice(action.type === "answer_interrogation" ? "Checking your timeline…" : "Consulting Raymond…");
+    setNotice(action.type === "answer_interrogation" ? "Checking your timeline…" : "Dispatching the Emergency Backup Pigeon…");
     try {
       const response = await fetch(`/api/cases/${state.id}/actions`, {
         method: "POST",
