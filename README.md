@@ -2,30 +2,6 @@
 
 Extrcuse Generater is a full-stack comedy demo for turning a harmless everyday situation into an increasingly elaborate excuse. It remembers recurring lore, escalates into a Y2K reality collapse, launches an eight-second pigeon paperwork arcade, and ends with a five-question contradiction check.
 
-The interface starts colorful and orderly, then progresses through glossy Web 2.0, office-dialog chaos, Flash-era motion, and GeoCities-style arcade maximalism. Navigation, forms, safety information, and the excuse document remain readable and stable throughout.
-
-> **Project status:** feature-complete demo. The intentional spelling of “Extrcuse Generater” is the product name.
-
-## Demo flow
-
-1. Enter a harmless situation and choose the audience, role, genre, and starting chaos.
-2. Generate an initial excuse with SEA-LION.
-3. Make it worse, add detail, add lore, or escalate the universe.
-4. Meet the Emergency Backup Pigeon and preserve its increasingly unnecessary continuity.
-5. At chaos 8–10, play or skip recurring **Paperwork Panic** arcade rounds.
-6. Answer five interrogation questions and receive the final recommendation to stop escalating.
-
-## Highlights
-
-- **Progressive Y2K interface:** exact chaos levels `0–10` drive color, typography, panel offsets, stickers, scanlines, faux dialogs, and bounded animation.
-- **Singapore-aware generation:** SEA-LION provides multilingual, locally aware comedy through its OpenAI-compatible API.
-- **Authoritative story state:** lore, claims, contradictions, metrics, interrogation history, arcade results, and collectibles survive reloads.
-- **Paperwork Panic:** deterministic keyboard/touch arcade rounds with server-validated outcomes and clamped metric effects.
-- **Original audio:** Web Audio oscillator/noise cues, arcade-only music, visible captions, persistent mute, and master volume.
-- **Anonymous persistence:** cases belong to a random HttpOnly browser token; no account or personal profile is required.
-- **Safe fallback:** provider timeouts, malformed responses, refusals, and unsafe output use clearly labeled deterministic continuations.
-- **Accessible chaos:** stable DOM and focus order, 44px controls, keyboard operation, focus restoration, AA-oriented tokens, and full reduced-motion behavior.
-
 ## Technology
 
 - Next.js 16 App Router, React 19, and TypeScript
@@ -122,21 +98,6 @@ Provider output is parsed into Zod schemas and merged into deterministic state o
 | `POST` | `/api/cases/:id/actions` | Apply a versioned transformation, interrogation answer, or arcade result. |
 | `GET` | `/api/health` | Check application and database readiness. |
 
-## Audio and Paperwork Panic
-
-Sound begins in an armed state and can activate only from a user’s Generate or escalation click. The header exposes immediate mute and a persistent volume slider; significant sounds also receive visible captions. Audio is suspended when the page is hidden and background music exists only during arcade rounds.
-
-Critical actions at chaos `8–10` queue Paperwork Panic after generation completes. Each round:
-
-- lasts eight seconds;
-- supports arrows, WASD, and touch controls;
-- asks the pigeon to collect three forms while avoiding red tape;
-- can always be skipped with the visible button or `Escape`;
-- uses a deterministic scenario/action seed;
-- records deliveries, misfiles, skips, scores, and collectibles server-side.
-
-Reduced-motion mode freezes decorative animation and uses static, turn-based hazard movement.
-
 ## Safety and privacy
 
 - Cases are linked to this browser. No account required.
@@ -179,15 +140,3 @@ Browsers require a user gesture before Web Audio can start. Click Generate or an
 ### A pending arcade returns after reload
 
 This is intentional. Pending rounds are authoritative case state. Play the round, choose **Skip nonsense**, or press `Escape` to resolve it safely.
-
-## Project layout
-
-```text
-src/app/                 Next.js pages, styles, and API routes
-src/components/          Main application, audio director, and arcade
-src/lib/                 Chaos engine, SEA-LION adapter, safety, DB, and store
-drizzle/                 PostgreSQL migrations and metadata
-public/art/y2k/          Original optimized Y2K asset pack
-tests/e2e/               Playwright flows and visual baselines
-railway.json             Railway build, migration, start, and health config
-```
